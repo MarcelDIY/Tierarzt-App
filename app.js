@@ -529,6 +529,12 @@ Gib nur den strukturierten Text zurück, keine Erklärungen oder Kommentare.`;
         });
       });
       aktionen.appendChild(btnKopieren);
+
+      const btnExport = document.createElement("button");
+      btnExport.textContent = "Als .txt teilen";
+      btnExport.className   = "btn-export";
+      btnExport.addEventListener("click", () => exportiereDiktat(diktat, nummer));
+      aktionen.appendChild(btnExport);
     }
 
     if (diktat.status === "error") {
@@ -560,6 +566,40 @@ Gib nur den strukturierten Text zurück, keine Erklärungen oder Kommentare.`;
 
     div.appendChild(aktionen);
     return div;
+  }
+
+  // ── Export als .txt (Teilen oder Download) ─────────────────────────────────
+
+  async function exportiereDiktat(diktat, nummer) {
+    const datum = new Date(diktat.erstellt);
+    const pad   = (n) => String(n).padStart(2, "0");
+    const stamp = `${datum.getFullYear()}-${pad(datum.getMonth() + 1)}-${pad(datum.getDate())}`
+                + `_${pad(datum.getHours())}-${pad(datum.getMinutes())}`;
+    const dateiname = `Diktat_${nummer}_${stamp}.txt`;
+
+    const kopf  = `Diktat #${nummer}\nErstellt: ${datum.toLocaleString("de-DE")}\n\n`;
+    const datei = new File([kopf + diktat.strukturierterText], dateiname, { type: "text/plain" });
+
+    // Bevorzugt: Web Share API mit Datei (öffnet System-Teilen-Sheet → KDE Connect, AirDrop, E-Mail …)
+    if (navigator.canShare && navigator.canShare({ files: [datei] })) {
+      try {
+        await navigator.share({ files: [datei], title: dateiname });
+        return;
+      } catch (err) {
+        if (err.name === "AbortError") return; // Nutzer hat abgebrochen
+        // sonst weiter zum Download-Fallback
+      }
+    }
+
+    // Fallback: Datei herunterladen
+    const url = URL.createObjectURL(datei);
+    const a   = document.createElement("a");
+    a.href     = url;
+    a.download = dateiname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function statusText(status) {

@@ -1,7 +1,7 @@
 // Service Worker für Tierarzt Diktat App
 // Strategie: Cache-First für lokale Ressourcen, Network-Only für API-Aufrufe
 
-const CACHE_NAME = 'tierarzt-diktat-v3';
+const CACHE_NAME = 'tierarzt-diktat-v4';
 
 // Dateien, die beim Installieren gecacht werden
 const DATEIEN_ZUM_CACHEN = [
