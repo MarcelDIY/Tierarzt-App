@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <!-- Mobile-First Viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <!-- PWA Meta-Tags -->
+  <meta name="theme-color" content="#2196F3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Tier-Diktat">
+  <meta name="description" content="Tierarzt Diktat-App – Sprache zu strukturiertem Text">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <title>Tierarzt Diktat</title>
+
+  <style>
+    /* ===========================
+       CSS Reset & Grundeinstellungen
+    =========================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      /* Farbpalette */
+      --farbe-akzent:       #2196F3;
+      --farbe-akzent-dunkel:#1565C0;
+      --farbe-aufnahme:     #F44336;
+      --farbe-aufnahme-dunkel: #C62828;
+      --farbe-hintergrund:  #F5F7FA;
+      --farbe-oberflaeche:  #FFFFFF;
+      --farbe-rand:         #E0E4EA;
+      --farbe-text:         #1A1A2E;
+      --farbe-text-weich:   #6B7280;
+      --farbe-schatten:     rgba(0, 0, 0, 0.08);
+
+      /* Status-Farben */
+      --status-aufnahme:    #F44336;
+      --status-warten:      #FFC107;
+      --status-verarbeitung:#FF9800;
+      --status-fertig:      #4CAF50;
+      --status-fehler:      #F44336;
+      --status-neu:         #9E9E9E;
+
+      /* Abstände */
+      --abstand-xs: 4px;
+      --abstand-s:  8px;
+      --abstand-m:  16px;
+      --abstand-l:  24px;
+      --abstand-xl: 32px;
+
+      /* Typografie */
+      --schrift-basis: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --radius:        12px;
+      --radius-s:      8px;
+
+      /* Mindesthöhe für Touch-Targets */
+      --touch-min: 56px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--schrift-basis);
+      background-color: var(--farbe-hintergrund);
+      color: var(--farbe-text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ===========================
+       App-Layout (Vollbild, kein Scroll auf Body)
+    =========================== */
+    .app-wrapper {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh; /* dvh für mobile Browser mit Adressleiste */
+      max-width: 640px;
+      margin: 0 auto;
+      background: var(--farbe-oberflaeche);
+      box-shadow: 0 0 40px var(--farbe-schatten);
+    }
+
+    /* ===========================
+       Statusleiste oben (#status-bar)
+    =========================== */
+    #status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--abstand-s) var(--abstand-m);
+      background: var(--farbe-akzent);
+      color: #fff;
+      min-height: 52px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .status-bar__titel {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    /* Online/Offline-Indikator innerhalb der Statusleiste */
+    .status-bar__verbindung {
+      display: flex;
+      align-items: center;
+      gap: var(--abstand-xs);
+      font-size: 0.8rem;
+      font-weight: 500;
+      opacity: 0.9;
+    }
+
+    .status-bar__verbindung::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #69F0AE; /* grün = online */
+    }
+
+    /* Klasse die per JS gesetzt wird */
+    .status-bar__verbindung.offline::before {
+      background: #FF5252; /* rot = offline */
+    }
+
+    /* Statusleisten-Hintergrund: per Klasse statt inline-style */
+    #status-bar.offline {
+      background: #e67e22;
+    }
+
+    #status-bar.hinweis {
+      background: #e67e22;
+    }
+
+    #status-bar.fehler {
+      background: #c0392b;
+    }
+
+    /* Einstellungen-Button in der Statusleiste */
+    #btn-settings {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: #fff;
+      padding: var(--abstand-s);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    #btn-settings:hover,
+    #btn-settings:focus-visible {
+      background: rgba(255,255,255,0.2);
+      outline: none;
+    }
+
+    #btn-settings svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+
+    /* ===========================
+       Aufnahme-Bereich (zentriert, oben)
+    =========================== */
+    .aufnahme-bereich {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--abstand-xl) var(--abstand-m) var(--abstand-l);
+      gap: var(--abstand-m);
+    }
+
+    /* Timer-Anzeige */
+    #recording-timer {
+      font-size: 2.8rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.05em;
+      color: var(--farbe-text);
+      min-width: 120px;
+      text-align: center;
+      /* Anfangs halbtransparent – wird per JS aktiv gesetzt */
+      opacity: 0.35;
+      transition: opacity 0.3s;
+    }
+
+    /* Wenn Aufnahme läuft */
+    #recording-timer.aktiv {
+      opacity: 1;
+      color: var(--farbe-aufnahme);
+    }
+
+    /* Haupt-Aufnahme-Button */
+    #btn-record {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      background: var(--farbe-akzent);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--abstand-s);
+      box-shadow:
+        0 8px 24px rgba(33, 150, 243, 0.4),
+        0 2px 8px rgba(0,0,0,0.12);
+      transition:
+        background 0.2s,
+        box-shadow 0.2s,
+        transform 0.1s;
+      /* Verhindert Text-Auswahl beim langen Drücken */
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #btn-record:active {
+      transform: scale(0.96);
+    }
+
+    /* Aufnahme-Button im aktiven Zustand (Klasse per JS) */
+    #btn-record.aufnahme-aktiv {
+      background: var(--farbe-aufnahme);
+      box-shadow:
+        0 8px 24px rgba(244, 67, 54, 0.45),
+        0 2px 8px rgba(0,0,0,0.15);
+      animation: pulsieren 1.8s ease-in-out infinite;
+    }
+
+    /* Mikrofon-Icon im Button */
+    #btn-record .btn-record__icon {
+      width: 48px;
+      height: 48px;
+      fill: currentColor;
+    }
+
+    /* Pulsier-Animation während der Aufnahme */
+    @keyframes pulsieren {
+      0%, 100% { box-shadow: 0 8px 24px rgba(244, 67, 54, 0.45), 0 2px 8px rgba(0,0,0,0.15); }
+      50%       { box-shadow: 0 8px 36px rgba(244, 67, 54, 0.7),  0 2px 8px rgba(0,0,0,0.15); }
+    }
+
+    /* Hilfstext unter dem Aufnahme-Button */
+    .aufnahme-hinweis {
+      font-size: 0.85rem;
+      color: var(--farbe-text-weich);
+      text-align: center;
+    }
+
+    /* Sekundärer Stop-Button (sichtbar wenn pausiert) */
+    #btn-stop {
+      min-height: var(--touch-min);
+      padding: 0 var(--abstand-l);
+      border-radius: var(--radius-s);
+      border: 1.5px solid var(--farbe-aufnahme);
+      background: transparent;
+      color: var(--farbe-aufnahme);
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #btn-stop:hover {
+      background: rgba(244, 67, 54, 0.08);
+    }
+
+    #btn-stop:active {
+      transform: scale(0.97);
+    }
+
+    /* Audio-Player innerhalb eines Diktats */
+    .dictation-audio {
+      width: calc(100% - 2 * var(--abstand-m));
+      margin: 0 var(--abstand-m) var(--abstand-m);
+      height: 40px;
+    }
+
+    /* Fehlertext innerhalb eines Diktats */
+    .dictation-fehler {
+      margin: 0 var(--abstand-m) var(--abstand-m);
+      padding: var(--abstand-s) var(--abstand-m);
+      background: rgba(244, 67, 54, 0.08);
+      border-left: 3px solid var(--farbe-aufnahme);
+      border-radius: var(--radius-s);
+      color: #C62828;
+      font-size: 0.85rem;
+    }
+
+    /* ===========================
+       Trennlinie
+    =========================== */
+    .trennlinie {
+      height: 1px;
+      background: var(--farbe-rand);
+      margin: 0 var(--abstand-m);
+    }
+
+    /* ===========================
+       Diktatliste (#dictation-list)
+    =========================== */
+    .liste-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--abstand-m) var(--abstand-m) var(--abstand-s);
+    }
+
+    .liste-header__titel {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--farbe-text-weich);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    #dictation-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 var(--abstand-m) var(--abstand-xl);
+      display: flex;
+      flex-direction: column;
+      gap: var(--abstand-m);
+      /* Sanfter Scroll auf iOS */
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Leerer Zustand */
+    #dictation-list:empty::after {
+      content: 'Noch keine Diktate vorhanden.\AStarte eine Aufnahme mit dem Button oben.';
+      white-space: pre;
+      display: block;
+      text-align: center;
+      color: var(--farbe-text-weich);
+      font-size: 0.9rem;
+      margin-top: var(--abstand-xl);
+      line-height: 1.7;
+    }
+
+    /* ===========================
+       Einzelnes Diktat (.dictation-item)
+       – Struktur wird per JS eingefügt
+    =========================== */
+    .dictation-item {
+      background: var(--farbe-oberflaeche);
+      border: 1px solid var(--farbe-rand);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 2px 8px var(--farbe-schatten);
+      transition: box-shadow 0.2s;
+    }
+
+    .dictation-item:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+
+    /* Kopfzeile eines Diktats */
+    .dictation-item__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--abstand-m);
+      gap: var(--abstand-s);
+    }
+
+    /* Titel des Diktats */
+    .dictation-title {
+      font-weight: 600;
+      font-size: 1rem;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ===========================
+       Status-Badges (.dictation-status)
+    =========================== */
+    .dictation-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Punkt vor dem Status-Text */
+    .dictation-status::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* Farbcodierung der Status */
+    .dictation-status.status-recording {
+      background: rgba(244, 67, 54, 0.1);
+      color: #C62828;
+    }
+
+    .dictation-status.status-waiting {
+      background: rgba(255, 193, 7, 0.15);
+      color: #B45309;
+    }
+
+    .dictation-status.status-processing {
+      background: rgba(255, 152, 0, 0.15);
+      color: #B26A00;
+    }
+
+    .dictation-status.status-done {
+      background: rgba(76, 175, 80, 0.1);
+      color: #2E7D32;
+    }
+
+    .dictation-status.status-error {
+      background: rgba(244, 67, 54, 0.1);
+      color: #C62828;
+    }
+
+    /* ===========================
+       Aktions-Buttons in einem Diktat
+    =========================== */
+    .dictation-item__aktionen {
+      display: flex;
+      gap: var(--abstand-s);
+      padding: 0 var(--abstand-m) var(--abstand-m);
+      flex-wrap: wrap;
+    }
+
+    /* Basis-Stil für alle Diktat-Buttons */
+    .dictation-item__aktionen button {
+      min-height: var(--touch-min);
+      padding: 0 var(--abstand-m);
+      border-radius: var(--radius-s);
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      gap: var(--abstand-xs);
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .dictation-item__aktionen button:active {
+      transform: scale(0.97);
+    }
+
+    /* Kopieren-Button */
+    .btn-copy {
+      background: var(--farbe-akzent);
+      color: #fff;
+      flex: 1;
+    }
+
+    .btn-copy:hover {
+      background: var(--farbe-akzent-dunkel);
+    }
+
+    /* Erneut-versuchen-Button */
+    .btn-retry {
+      background: #FF9800;
+      color: #fff;
+      flex: 1;
+    }
+
+    .btn-retry:hover {
+      background: #E65100;
+    }
+
+    /* Löschen-Button */
+    .btn-delete {
+      background: rgba(244, 67, 54, 0.1);
+      color: var(--farbe-aufnahme);
+      flex-shrink: 0;
+    }
+
+    .btn-delete:hover {
+      background: rgba(244, 67, 54, 0.2);
+    }
+
+    /* ===========================
+       Ergebnis-Text (.dictation-result)
+    =========================== */
+    .dictation-result {
+      margin: 0 var(--abstand-m) var(--abstand-m);
+      padding: var(--abstand-m);
+      background: var(--farbe-hintergrund);
+      border-radius: var(--radius-s);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: var(--farbe-text);
+      white-space: pre-wrap;
+      border-left: 3px solid var(--farbe-akzent);
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    /* ===========================
+       Einstellungen-Modal (#settings-modal)
+    =========================== */
+    #settings-modal {
+      /* Standardmäßig versteckt */
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      /* Hintergrund-Overlay */
+      background: rgba(0, 0, 0, 0.55);
+      align-items: flex-end; /* Slide-up von unten auf Mobile */
+      justify-content: center;
+      padding: 0;
+    }
+
+    /* Wenn per JS geöffnet (display:flex) */
+    #settings-modal.offen {
+      display: flex;
+    }
+
+    /* Modal-Inhalt */
+    .modal-inhalt {
+      background: var(--farbe-oberflaeche);
+      border-radius: var(--radius) var(--radius) 0 0;
+      width: 100%;
+      max-width: 640px;
+      max-height: 92dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Auf Desktop: zentriertes Fenster */
+    @media (min-width: 600px) {
+      #settings-modal {
+        align-items: center;
+        padding: var(--abstand-m);
+      }
+
+      .modal-inhalt {
+        border-radius: var(--radius);
+        max-height: 88dvh;
+      }
+    }
+
+    /* Modal-Kopfzeile */
+    .modal-kopf {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--abstand-l) var(--abstand-m) var(--abstand-m);
+      border-bottom: 1px solid var(--farbe-rand);
+      position: sticky;
+      top: 0;
+      background: var(--farbe-oberflaeche);
+      z-index: 10;
+    }
+
+    .modal-kopf__titel {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    /* Schließen-Button */
+    #btn-close-settings {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--farbe-text-weich);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    #btn-close-settings:hover {
+      background: var(--farbe-hintergrund);
+    }
+
+    /* Modal-Körper mit Formular */
+    .modal-body {
+      padding: var(--abstand-m);
+      display: flex;
+      flex-direction: column;
+      gap: var(--abstand-l);
+    }
+
+    /* Formulargruppe */
+    .form-gruppe {
+      display: flex;
+      flex-direction: column;
+      gap: var(--abstand-s);
+    }
+
+    .form-gruppe label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--farbe-text-weich);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Eingabefelder */
+    .form-gruppe input[type="password"],
+    .form-gruppe input[type="text"],
+    .form-gruppe textarea {
+      width: 100%;
+      min-height: var(--touch-min);
+      padding: var(--abstand-m);
+      border: 1.5px solid var(--farbe-rand);
+      border-radius: var(--radius-s);
+      font-size: 1rem;
+      font-family: inherit;
+      color: var(--farbe-text);
+      background: var(--farbe-hintergrund);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    .form-gruppe input[type="password"]:focus,
+    .form-gruppe input[type="text"]:focus,
+    .form-gruppe textarea:focus {
+      border-color: var(--farbe-akzent);
+      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.15);
+    }
+
+    /* Prompt-Textarea größer */
+    .form-gruppe textarea {
+      min-height: 180px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    /* Hilfstext unter einem Feld */
+    .form-hilfe {
+      font-size: 0.8rem;
+      color: var(--farbe-text-weich);
+    }
+
+    /* ===========================
+       Modal-Fußzeile mit Aktions-Buttons
+    =========================== */
+    .modal-fuss {
+      display: flex;
+      gap: var(--abstand-s);
+      padding: var(--abstand-m);
+      border-top: 1px solid var(--farbe-rand);
+      position: sticky;
+      bottom: 0;
+      background: var(--farbe-oberflaeche);
+      flex-wrap: wrap;
+    }
+
+    /* Speichern-Button */
+    #btn-save-settings {
+      flex: 1;
+      min-height: var(--touch-min);
+      background: var(--farbe-akzent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-s);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    #btn-save-settings:hover {
+      background: var(--farbe-akzent-dunkel);
+    }
+
+    #btn-save-settings:active {
+      transform: scale(0.98);
+    }
+
+    /* Prompt-Reset-Button */
+    #btn-reset-prompt {
+      min-height: var(--touch-min);
+      padding: 0 var(--abstand-m);
+      background: var(--farbe-hintergrund);
+      color: var(--farbe-text-weich);
+      border: 1.5px solid var(--farbe-rand);
+      border-radius: var(--radius-s);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s, color 0.2s;
+      white-space: nowrap;
+    }
+
+    #btn-reset-prompt:hover {
+      background: var(--farbe-rand);
+      color: var(--farbe-text);
+    }
+
+    /* ===========================
+       Toast-Benachrichtigung (per JS eingeblendet)
+    =========================== */
+    #toast {
+      position: fixed;
+      bottom: var(--abstand-xl);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #323232;
+      color: #fff;
+      padding: var(--abstand-s) var(--abstand-l);
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      white-space: nowrap;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    #toast.sichtbar {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ===========================
+       Scrollbar-Styling (Webkit)
+    =========================== */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--farbe-rand);
+      border-radius: 2px;
+    }
+
+    /* ===========================
+       Fokus-Stile für Barrierefreiheit
+    =========================== */
+    :focus-visible {
+      outline: 3px solid var(--farbe-akzent);
+      outline-offset: 2px;
+    }
+
+    /* ===========================
+       Utility: verstecken
+    =========================== */
+    .versteckt {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ===========================
+       Haupt-App-Container
+  =========================== -->
+  <div class="app-wrapper">
+
+    <!-- ===========================
+         Statusleiste (Screen 1)
+         JS schreibt Online/Offline-Text in .status-bar__verbindung
+    =========================== -->
+    <header id="status-bar" role="banner">
+      <span class="status-bar__titel">Tierarzt Diktat</span>
+      <span class="status-bar__verbindung" id="verbindungs-status">Online</span>
+
+      <!-- Einstellungen-Button (Zahnrad-SVG) -->
+      <button id="btn-settings" aria-label="Einstellungen öffnen" title="Einstellungen">
+        <!-- Zahnrad-Icon (Material Design, inline SVG) -->
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.44.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- ===========================
+         Aufnahme-Bereich (Screen 1)
+    =========================== -->
+    <section class="aufnahme-bereich" aria-label="Aufnahme-Steuerung">
+
+      <!-- Timer: zeigt Aufnahmedauer an -->
+      <div id="recording-timer" aria-live="polite" aria-label="Aufnahmedauer">00:00</div>
+
+      <!-- Zentraler Aufnahme-Button -->
+      <button id="btn-record" aria-label="Aufnahme starten">
+        <!-- Mikrofon-Icon (inline SVG) -->
+        <svg class="btn-record__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V20H9v2h6v-2h-2v-2.07A7 7 0 0 0 19 11h-2z"/>
+        </svg>
+        <!-- JS schreibt hier den Button-Text rein (Starten / Pause / Weiter / Stoppen) -->
+        <span class="btn-record__label">Starten</span>
+      </button>
+
+      <!-- Sekundärer Stop-Button (nur sichtbar wenn pausiert) -->
+      <button id="btn-stop" class="versteckt" type="button">Aufnahme beenden</button>
+
+      <!-- Kurzer Hinweistext -->
+      <p class="aufnahme-hinweis" aria-live="polite" id="aufnahme-hinweis-text">
+        Drücke den Button, um ein Diktat zu starten
+      </p>
+    </section>
+
+    <!-- Optische Trennung -->
+    <div class="trennlinie" role="separator"></div>
+
+    <!-- ===========================
+         Liste der Diktate (Screen 1)
+         JS fügt hier .dictation-item Elemente ein
+    =========================== -->
+    <section aria-label="Diktat-Liste">
+      <div class="liste-header">
+        <span class="liste-header__titel">Diktate</span>
+      </div>
+
+      <div id="dictation-list" role="list" aria-label="Gespeicherte Diktate">
+        <!--
+          Hier fügt JavaScript <div class="dictation-item"> Elemente ein.
+          Struktur je Diktat (Referenz für JS):
+
+          <div class="dictation-item" role="listitem" data-id="...">
+            <div class="dictation-item__header">
+              <span class="dictation-title">Diktat #1</span>
+              <span class="dictation-status status-done">Fertig</span>
+            </div>
+            <div class="dictation-item__aktionen">
+              <button class="btn-copy">Kopieren</button>
+              <button class="btn-retry versteckt">Wiederholen</button>
+              <button class="btn-delete">Löschen</button>
+            </div>
+            <div class="dictation-result">Strukturierter Text...</div>
+          </div>
+        -->
+      </div>
+    </section>
+
+  </div><!-- Ende .app-wrapper -->
+
+  <!-- ===========================
+       Toast-Benachrichtigung
+       JS setzt Klasse .sichtbar
+  =========================== -->
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ===========================
+       Einstellungen-Modal (Screen 2)
+       JS setzt Klasse .offen zum Einblenden
+  =========================== -->
+  <div
+    id="settings-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modal-titel"
+  >
+    <div class="modal-inhalt">
+
+      <!-- Modal-Kopfzeile -->
+      <div class="modal-kopf">
+        <h2 class="modal-kopf__titel" id="modal-titel">Einstellungen</h2>
+        <button id="btn-close-settings" aria-label="Einstellungen schließen">&#x2715;</button>
+      </div>
+
+      <!-- Formular-Inhalt -->
+      <div class="modal-body">
+
+        <!-- OpenAI API Key -->
+        <div class="form-gruppe">
+          <label for="input-openai-key">OpenAI API-Schlüssel</label>
+          <input
+            type="password"
+            id="input-openai-key"
+            name="openai-key"
+            placeholder="sk-..."
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+          >
+          <span class="form-hilfe">Wird für die Sprachtranskription (Whisper) verwendet.</span>
+        </div>
+
+        <!-- Anthropic API Key -->
+        <div class="form-gruppe">
+          <label for="input-anthropic-key">Anthropic API-Schlüssel</label>
+          <input
+            type="password"
+            id="input-anthropic-key"
+            name="anthropic-key"
+            placeholder="sk-ant-..."
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+          >
+          <span class="form-hilfe">Wird für die Textstrukturierung mit Claude verwendet.</span>
+        </div>
+
+        <!-- Claude-Prompt -->
+        <div class="form-gruppe">
+          <label for="input-prompt">Claude-Prompt</label>
+          <textarea
+            id="input-prompt"
+            name="prompt"
+            placeholder="Strukturiere das folgende Tierarzt-Diktat..."
+            spellcheck="true"
+            lang="de"
+          ></textarea>
+          <span class="form-hilfe">Dieser Prompt wird vor dem transkribierten Text an Claude gesendet.</span>
+        </div>
+
+      </div><!-- Ende .modal-body -->
+
+      <!-- Modal-Fußzeile -->
+      <div class="modal-fuss">
+        <button id="btn-reset-prompt" type="button">Prompt zurücksetzen</button>
+        <button id="btn-save-settings" type="button">Einstellungen speichern</button>
+      </div>
+
+    </div><!-- Ende .modal-inhalt -->
+  </div><!-- Ende #settings-modal -->
+
+  <!-- JavaScript-Logik (extern, kein JS im HTML) -->
+  <script src="app.js" defer></script>
+</body>
+</html>
